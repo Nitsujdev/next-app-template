@@ -1,24 +1,42 @@
 import { toast } from "sonner";
 
-export const handleError = (error: unknown) => {
+export function handleError(title: string, error: unknown) {
+  console.error(`${title}:`, error);
+
   const message =
     error instanceof Error
       ? error.message
-      : "Ein unerwarteter Fehler ist aufgetreten";
+      : error?.toString() || "Ein unbekannter Fehler ist aufgetreten";
 
-  if (typeof window !== "undefined") {
-    // Nur im Browser ausführen
-    toast.error("Es ist ein Fehler aufgetreten", {
-      description: message,
-      duration: 5000,
-    });
-  }
-
-  console.error(error);
-};
-
-export const handleSuccess = (message: string) => {
-  toast.success(message, {
+  toast.error(title, {
+    description: message,
     duration: 5000,
   });
-};
+}
+
+export function handleSuccess(title: string, message?: string) {
+  console.log(`${title}:`, message);
+
+  toast.success(title, {
+    description: message,
+    duration: 3000,
+  });
+}
+
+export function handleWarning(title: string, message?: string) {
+  console.warn(`${title}:`, message);
+
+  toast.warning(title, {
+    description: message,
+    duration: 4000,
+  });
+}
+
+export function handleInfo(title: string, message?: string) {
+  console.info(`${title}:`, message);
+
+  toast.info(title, {
+    description: message,
+    duration: 3000,
+  });
+}
