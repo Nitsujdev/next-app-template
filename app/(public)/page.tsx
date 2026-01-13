@@ -65,7 +65,7 @@ export default function Home() {
       <section className="relative flex flex-col items-center justify-center text-center py-20 md:py-32 overflow-hidden">
         {/* Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent -z-10" />
-        
+
         <div className="flex flex-col gap-6 w-full max-w-4xl mx-auto px-4">
           {/* Badge */}
           <div className="flex justify-center">
