@@ -2,13 +2,14 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Profile, ProfileUpdate, CombinedProfile } from "@/lib/types/profile";
 import {
   getUserProfileWithAuth,
   updateUserProfile,
   softDeleteUserProfile,
 } from "@/lib/supabase/functions";
+import { handleError, handleSuccess } from "@/lib/utils/result-handler";
 
 export interface UseUserReturn {
   user: User | null;
@@ -33,57 +34,75 @@ export function useUser(): UseUserReturn {
   const supabase = createClient();
 
   // Profil mit Auth-Daten abrufen
-  const fetchProfile = async (userId: string): Promise<Profile | null> => {
-    try {
-      const data: CombinedProfile = await getUserProfileWithAuth(userId);
-      setProfile(data.profile);
-      return data.profile;
-    } catch (err) {
-      console.error("Error in fetchProfile:", err);
-      setError("Failed to fetch profile");
-      return null;
-    }
-  };
+  const fetchProfile = useCallback(
+    async (userId: string): Promise<Profile | null> => {
+      try {
+        const data: CombinedProfile = await getUserProfileWithAuth(userId);
+        setProfile(data.profile);
+        setError(null);
+        return data.profile;
+      } catch (err) {
+        handleError("Profil laden fehlgeschlagen", err);
+        setError("Failed to fetch profile");
+        return null;
+      }
+    },
+    []
+  );
 
   // Profil aktualisieren
-  const updateProfileData = async (updates: ProfileUpdate) => {
-    if (!user) {
-      setError("No user logged in");
-      return;
-    }
+  const updateProfileData = useCallback(
+    async (updates: ProfileUpdate) => {
+      if (!user) {
+        handleError("Update nicht möglich", "Kein Benutzer angemeldet");
+        setError("No user logged in");
+        return;
+      }
 
-    try {
-      const data = await updateUserProfile(user.id, updates);
-      setProfile(data);
-    } catch (err) {
-      console.error("Error in updateProfile:", err);
-      setError("Failed to update profile");
-    }
-  };
+      try {
+        setLoading(true);
+        const data = await updateUserProfile(user.id, updates);
+        setProfile(data);
+        setError(null);
+        handleSuccess("Profil aktualisiert", "Deine Änderungen wurden gespeichert");
+      } catch (err) {
+        handleError("Profil aktualisieren fehlgeschlagen", err);
+        setError("Failed to update profile");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user]
+  );
 
   // Profil löschen (soft delete)
-  const deleteProfileData = async () => {
+  const deleteProfileData = useCallback(async () => {
     if (!user) {
+      handleError("Löschen nicht möglich", "Kein Benutzer angemeldet");
       setError("No user logged in");
       return;
     }
 
     try {
+      setLoading(true);
       await softDeleteUserProfile(user.id);
-      await refreshProfile();
+      await fetchProfile(user.id);
+      handleSuccess("Profil gelöscht", "Dein Profil wurde erfolgreich gelöscht");
     } catch (err) {
-      console.error("Error in deleteProfile:", err);
+      handleError("Profil löschen fehlgeschlagen", err);
       setError("Failed to delete profile");
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [user, fetchProfile]);
 
   // Profil neu laden
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (!user) return;
     setLoading(true);
     await fetchProfile(user.id);
     setLoading(false);
-  };
+  }, [user, fetchProfile]);
 
   useEffect(() => {
     // Initiale Session abrufen
@@ -91,12 +110,12 @@ export function useUser(): UseUserReturn {
       try {
         const {
           data: { session },
-          error,
+          error: sessionError,
         } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("Error getting session:", error);
-          setError(error.message);
+        if (sessionError) {
+          handleError("Session abrufen fehlgeschlagen", sessionError);
+          setError(sessionError.message);
           setLoading(false);
           return;
         }
@@ -108,7 +127,7 @@ export function useUser(): UseUserReturn {
 
         setLoading(false);
       } catch (err) {
-        console.error("Error in getInitialSession:", err);
+        handleError("Session initialisieren fehlgeschlagen", err);
         setError("Failed to get session");
         setLoading(false);
       }
@@ -120,7 +139,9 @@ export function useUser(): UseUserReturn {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[Auth State Change]:", event);
+      }
 
       if (session?.user) {
         setUser(session.user);
@@ -134,23 +155,23 @@ export function useUser(): UseUserReturn {
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase.auth]);
+  }, [supabase.auth, fetchProfile]);
 
   // Helper Funktionen für Benutzerinformationen
-  const getUsername = (): string => {
+  const getUsername = useCallback((): string => {
     if (!user) return "";
     return profile?.username || user.email?.split("@")[0] || "";
-  };
+  }, [user, profile]);
 
-  const getDisplayName = (): string => {
+  const getDisplayName = useCallback((): string => {
     if (!user) return "";
     return user.user_metadata?.name || profile?.username || user.email || "";
-  };
+  }, [user, profile]);
 
-  const getAvatarUrl = (): string | undefined => {
+  const getAvatarUrl = useCallback((): string | undefined => {
     if (!user) return undefined;
     return user.user_metadata?.avatar_url || undefined;
-  };
+  }, [user]);
 
   return {
     user,

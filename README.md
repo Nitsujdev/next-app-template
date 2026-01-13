@@ -4,23 +4,23 @@ Ein modernes, produktionsreifes Next.js Template mit Supabase, TypeScript und sh
 
 ## 🚀 Features
 
-- **Next.js 15** mit App Router
+- **Next.js 16** mit App Router & Turbopack (default)
 - **React 19** mit neuesten Features
 - **TypeScript** für bessere Developer Experience
 - **Tailwind CSS 4** mit shadcn/ui Components
 - **Supabase** für Backend-as-a-Service
 - **Authentifizierung** mit Google OAuth & Magic Links
 - **Responsive Design** mit Mobile-First Approach
-- **Form Validation** mit Zod
-- **Error Handling** mit Toast Notifications
+- **Form Validation** mit Zod 4
+- **Error Handling** mit Toast Notifications (Sonner)
 - **Infinite Scrolling** für bessere UX
 - **Theme Support** (Light/Dark/System)
-- **SEO Optimized** mit Metadata
+- **SEO Optimized** mit Metadata API
 
 ## 📋 Voraussetzungen
 
-- Node.js 18+
-- npm, yarn oder pnpm
+- Node.js 20.9.0+ (LTS)
+- npm, yarn, pnpm oder bun
 - Supabase Account
 
 ## 🛠️ Installation
@@ -40,11 +40,13 @@ npm install
 yarn install
 # oder
 pnpm install
+# oder
+bun install
 ```
 
 ### 3. Environment Variables
 
-Erstelle eine `.env.local` Datei:
+Erstelle eine `.env.local` Datei (kopiere von `env.example`):
 
 ```env
 # Supabase
@@ -58,10 +60,10 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ### 4. Supabase Setup
 
 1. **Projekt erstellen** auf [supabase.com](https://supabase.com)
-2. **Database Schema** einrichten (siehe unten)
+2. **Database Schema** einrichten (siehe `lib/supabase/database/`)
 3. **RPC Functions** einrichten:
    - Öffne den SQL Editor in Supabase
-   - Führe den SQL-Code aus `database/rpc-functions.sql` aus
+   - Führe die SQL-Dateien aus `lib/supabase/database/` aus
 4. **Authentication** konfigurieren:
    - Google OAuth Provider hinzufügen
    - Site URL: `http://localhost:3000`
@@ -75,102 +77,52 @@ npm run dev
 
 Öffne [http://localhost:3000](http://localhost:3000) in deinem Browser.
 
+> **Hinweis:** Turbopack ist in Next.js 16 standardmäßig aktiviert - kein `--turbopack` Flag mehr nötig!
+
 ## 🗄️ Database Schema
 
 ### Profile Table
 
 ```sql
--- Profile table für zusätzliche User-Daten (keine Duplikate von auth.users)
+-- Profile table für zusätzliche User-Daten
 CREATE TABLE profile (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  -- Nur zusätzliche Felder, die nicht in auth.users sind
+  username TEXT UNIQUE,
   bio TEXT,
-  website_url TEXT,
-  location TEXT,
-  company TEXT,
-  job_title TEXT,
-  social_links JSONB,
-  preferences JSONB,
+  settings JSONB,
+  metadata JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  deleted_at TIMESTAMP WITH TIME ZONE DEFAULT NULL
 );
-```
 
 -- RLS (Row Level Security) aktivieren
 ALTER TABLE profile ENABLE ROW LEVEL SECURITY;
 
 -- Policies für Profile
 CREATE POLICY "Users can view own profile" ON profile
-FOR SELECT USING (auth.uid() = user_id);
+  FOR SELECT USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can update own profile" ON profile
-FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid() = user_id);
 
 CREATE POLICY "Users can insert own profile" ON profile
-FOR INSERT WITH CHECK (auth.uid() = user_id);
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
 
 -- Trigger für updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
-NEW.updated_at = NOW();
-RETURN NEW;
+  NEW.updated_at = NOW();
+  RETURN NEW;
 END;
-
-$$
-language 'plpgsql';
+$$ language 'plpgsql';
 
 CREATE TRIGGER update_profile_updated_at
   BEFORE UPDATE ON profile
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
-
--- RPC Functions for Profile Management
--- Execute the SQL from database/rpc-functions.sql in your Supabase SQL Editor
-
-### Beispiel Profile Data
-
-```json
-{
-  "id": "123e4567-e89b-12d3-a456-426614174000",
-  "user_id": "auth-user-id-here",
-  "bio": "Full-stack developer passionate about building great user experiences.",
-  "website_url": "https://johndoe.dev",
-  "location": "Berlin, Germany",
-  "company": "Tech Corp",
-  "job_title": "Senior Software Engineer",
-  "social_links": {
-    "twitter": "https://twitter.com/johndoe",
-    "linkedin": "https://linkedin.com/in/johndoe",
-    "github": "https://github.com/johndoe"
-  },
-  "preferences": {
-    "theme": "system",
-    "language": "en",
-    "timezone": "Europe/Berlin",
-    "email_notifications": true,
-    "push_notifications": false,
-    "marketing_emails": false
-  },
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-20T14:45:00Z"
-}
-```
-
-### Daten aus auth.users (automatisch verfügbar)
-
-```json
-{
-  "id": "auth-user-id-here",
-  "email": "john.doe@example.com",
-  "user_metadata": {
-    "name": "John Doe",
-    "avatar_url": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
-  },
-  "created_at": "2024-01-15T10:30:00Z",
-  "updated_at": "2024-01-20T14:45:00Z"
-}
 ```
 
 ## 🏗️ Projektstruktur
@@ -178,29 +130,34 @@ CREATE TRIGGER update_profile_updated_at
 ```
 ├── app/                    # Next.js App Router
 │   ├── (auth)/            # Auth Routes (Login, Register)
-│   ├── (dashboard)/       # Protected Routes
+│   ├── (profile)/         # Protected Routes
+│   ├── (public)/          # Public Routes
 │   ├── api/               # API Routes
-│   ├── globals.css        # Global Styles
-│   └── layout.tsx         # Root Layout
+│   ├── globals.css        # Global Styles (Tailwind CSS 4)
+│   └── layout.tsx         # Root Layout mit Metadata
 ├── components/            # React Components
 │   ├── ui/               # shadcn/ui Components
-│   └── shared/           # Shared Components
+│   ├── shared/           # Shared Components
+│   ├── public/           # Public Page Components
+│   └── theme/            # Theme Provider & Toggle
 ├── hooks/                # Custom React Hooks
-│   ├── useUser.ts        # User Management
+│   ├── useUser.ts        # User Management Hook
 │   ├── use-mobile.ts     # Mobile Detection
-│   └── useInfiniteScroll.ts # Infinite Scrolling
+│   ├── useInfiniteScroll.ts # Infinite Scrolling
+│   └── useKeyboardShortcuts.ts # Keyboard Shortcuts
 ├── lib/                  # Utilities & Config
-│   ├── supabase/         # Supabase Client
+│   ├── supabase/         # Supabase Client & Functions
 │   ├── utils/            # Utility Functions
 │   ├── types/            # TypeScript Types
 │   ├── constants/        # App Constants
 │   └── validations/      # Zod Schemas
+├── proxy.ts              # Next.js Middleware (Supabase Auth)
 └── public/               # Static Assets
 ```
 
 ## 🎯 Verwendung
 
-### User Management
+### User Management (useUser Hook)
 
 ```tsx
 import { useUser } from "@/hooks/useUser";
@@ -210,9 +167,11 @@ export default function ProfilePage() {
     user,
     profile,
     loading,
+    error,
     updateProfile,
-    getUserDisplayName,
-    getUserAvatar
+    refreshProfile,
+    getDisplayName,
+    getAvatarUrl
   } = useUser();
 
   if (loading) return <div>Loading...</div>;
@@ -220,36 +179,42 @@ export default function ProfilePage() {
 
   return (
     <div>
-      <h1>Welcome, {getUserDisplayName()}</h1>
-      <img src={getUserAvatar()} alt="Avatar" />
+      <h1>Welcome, {getDisplayName()}</h1>
+      <img src={getAvatarUrl()} alt="Avatar" />
       <p>Email: {user.email}</p>
       <p>Bio: {profile?.bio}</p>
-      {/* Profile content */}
     </div>
   );
 }
 ```
 
-### Form Validation
+### Form Validation (Zod + React Hook Form)
 
 ```tsx
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { profileSchema, type ProfileForm } from "@/lib/validations";
+import { z } from "zod";
+
+const profileSchema = z.object({
+  username: z.string().min(3).max(50),
+  bio: z.string().max(500).optional(),
+});
+
+type ProfileForm = z.infer<typeof profileSchema>;
 
 export default function ProfileForm() {
   const form = useForm<ProfileForm>({
     resolver: zodResolver(profileSchema),
   });
 
-  const onSubmit = (data: ProfileForm) => {
+  const onSubmit = async (data: ProfileForm) => {
     // Handle form submission
   };
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)}>{/* Form fields */}</form>
-    </Form>
+    <form onSubmit={form.handleSubmit(onSubmit)}>
+      {/* Form fields */}
+    </form>
   );
 }
 ```
@@ -257,13 +222,13 @@ export default function ProfileForm() {
 ### Error Handling
 
 ```tsx
-import { handleError, handleSuccess } from "@/lib/utils/result-handler";
+import { handleError, handleSuccess, handleWarning } from "@/lib/utils/result-handler";
 
 try {
-  // API call
-  handleSuccess("Erfolgreich gespeichert");
+  await someApiCall();
+  handleSuccess("Erfolgreich", "Daten wurden gespeichert");
 } catch (error) {
-  handleError("Fehler beim Speichern", error);
+  handleError("Fehler", error);
 }
 ```
 
@@ -272,14 +237,14 @@ try {
 ### Vercel (Empfohlen)
 
 1. **Repository** zu GitHub pushen
-2. **Vercel Projekt** erstellen
+2. **Vercel Projekt** erstellen und Repository verbinden
 3. **Environment Variables** setzen:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `NEXT_PUBLIC_SITE_URL` (Production URL)
 4. **Deploy**
 
-### Andere Platforms
+### Andere Plattformen
 
 Das Template funktioniert auch mit:
 
@@ -287,47 +252,38 @@ Das Template funktioniert auch mit:
 - **Railway**
 - **DigitalOcean App Platform**
 - **AWS Amplify**
+- **Cloudflare Pages**
 
 ## 🎨 Customization
 
-### Theme anpassen
+### Theme anpassen (globals.css)
 
-```tsx
-// app/globals.css
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    /* Weitere CSS Variables */
-  }
+Das Template verwendet Tailwind CSS 4 mit CSS-first Konfiguration. Passe die Farben in `app/globals.css` an:
+
+```css
+@theme static {
+  --color-primary: oklch(0.5795 0.233 277);
+  --color-secondary: oklch(0.65 0.2406 354.4);
+  /* Weitere Farben... */
 }
 ```
 
-### Neue UI Components
+### Neue UI Components hinzufügen
 
 ```bash
 npx shadcn@latest add button
 npx shadcn@latest add card
-# Weitere Components...
-```
-
-### Supabase Functions
-
-```typescript
-// lib/supabase/functions.ts
-export async function customFunction() {
-  const supabase = createClient();
-  // Custom logic
-}
+npx shadcn@latest add form
 ```
 
 ## 📚 Nützliche Links
 
-- [Next.js Documentation](https://nextjs.org/docs)
+- [Next.js 16 Documentation](https://nextjs.org/docs)
 - [Supabase Documentation](https://supabase.com/docs)
 - [shadcn/ui Components](https://ui.shadcn.com)
-- [Tailwind CSS](https://tailwindcss.com)
-- [TypeScript](https://www.typescriptlang.org)
+- [Tailwind CSS v4](https://tailwindcss.com/docs)
+- [React 19](https://react.dev)
+- [Zod](https://zod.dev)
 
 ## 🤝 Contributing
 
@@ -352,4 +308,3 @@ Bei Fragen oder Problemen:
 ---
 
 **Viel Erfolg mit deiner neuen App! 🚀**
-$$

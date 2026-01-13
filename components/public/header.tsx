@@ -1,44 +1,55 @@
 "use client";
+
 import React from "react";
 import { ThemeToggle } from "@/components/theme/themeToggle";
-import { Button } from "@/components/ui/button";
-import { WindIcon, UserIcon } from "lucide-react";
-import Image from "next/image";
-import { useTheme } from "next-themes";
+import { RocketIcon, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+
 const PublicHeader = () => {
-  const { theme } = useTheme();
   return (
-    <>
-      <div className="bg-accent p-1 text-accent-foreground text-center flex items-center justify-center gap-1">
-        <WindIcon className="size-4" />
-        <span>
-          Aktueller Wind in Miami{" "}
-          <span className="font-bold">[19 Knoten aus Osten]</span>
-        </span>
-      </div>
-      <header className="py-4 container flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <Image
-            src={
-              theme === "dark"
-                ? "/brand/luftloch_light.svg"
-                : "/brand/luftloch_dark.svg"
-            }
-            alt="luftloch"
-            width={1}
-            height={1}
-            className="w-24"
-          />
-          <div className="flex items-center gap-2">
-            <Button variant="callToAction">
-              <UserIcon className="size-4" />
-              Account
-            </Button>
-            <ThemeToggle />
+    <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+        {/* Logo / Brand */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 font-bold text-lg hover:opacity-80 transition-opacity group"
+        >
+          <div className="relative">
+            <RocketIcon className="size-5 text-primary group-hover:scale-110 transition-transform" />
+            <Sparkles className="absolute -top-1 -right-1 size-2.5 text-primary animate-pulse" />
           </div>
+          <span>AppTemplate</span>
+        </Link>
+
+        {/* Navigation */}
+        <nav className="hidden md:flex items-center gap-6">
+          <Link
+            href="#features"
+            className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors relative group"
+          >
+            Features
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300" />
+          </Link>
+          <a
+            href="https://github.com/Nitsujdev/next-app-template"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
+          >
+            GitHub
+          </a>
+          <Badge variant="outline" className="text-xs border-primary/20 bg-primary/5">
+            v16.1
+          </Badge>
+        </nav>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 };
 

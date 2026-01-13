@@ -3,9 +3,9 @@ import PublicHeader from "@/components/public/header";
 import PublicFooter from "@/components/public/footer";
 
 export const metadata: Metadata = {
-  title: "luftloch | Alle relevanten Infos zu deinem Flug",
+  title: "Home",
   description:
-    "luftloch ist ein Tool, das dir hilft, alle relevanten Infos zu deinem Flug zu finden.",
+    "Welcome to our Next.js application - your modern web solution built with the latest technologies.",
 };
 
 export default function PublicLayout({
@@ -16,7 +16,7 @@ export default function PublicLayout({
   return (
     <>
       <PublicHeader />
-      <div className="container">{children}</div>
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">{children}</main>
       <PublicFooter />
     </>
   );
